@@ -1,0 +1,129 @@
+---
+title: "Tugas Individu Analisis Regresi"
+author: "Rakesha Putra Antique Yusuf"
+date: "2024-03-05"
+output: distill::distill_article
+---
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(ggridges)
+library(GGally)
+library(plotly)
+library(dplyr)
+library(lmtest)
+library(stats)
+```
+
+# Data
+```{r}
+data <- read_xlsx("C:/Users/RAKESHA/Downloads/Anreg Individu.xlsx")
+```
+# Eksplorasi Data
+```{r}
+plot(x = data$X, y = data$Y)
+```
+Dari scatter plot di atas menunjukan jika Y dan X tidak berhubungan linear 
+
+## Uji Normalitas
+```{r}
+qqnorm(data$Y)
+qqline(data$Y, col = "red")
+shapiro.test(data$Y)
+```
+Data yang diketahui menyebar normal dibuktikan dari hasil shapiro test yang lebih dari 0.05 walaupun hasil dari qq plot cenderung memiliki asumsi bahwa data tersebut tidak menyebar normal
+
+## Declare Model Regresi
+```{r}
+model_lm <- lm(formula = Y ~ X, data = data)
+summary(model_lm)
+model_lm
+```
+Model Regresi:
+$$ \hat Y = 46.4604 -0.7525 X $$
+## Uji Autokorelasi
+```{r}
+acf(model_lm$residuals)
+dwtest(model_lm)
+```
+Pada gambar ACF, nilai autokorelasi pada lag 1 adalah 0.5 dan nilai autokorelasi pada lag 2 adalah 0.4. Kedua nilai ini berada di luar batas kepercayaan 95%, yang menunjukkan bahwa autokorelasi pada lag 1 dan 2 signifikan.
+
+Gambar tersebut menunjukkan adanya asumsi Gauss-Markov yang tidak terpenuhi, yaitu asumsi non-autokorelasi. Hal tersebut juga diperkuat dari p-test hasil Uji Durbin-Watson yang bernilai kurang dari 0,05
+
+## Uji Homoskedastisitas
+```{r}
+plot(model_lm, which = 1)
+```
+Berdasarkan gambar di atas, terlihat bahwa varians residual konstan. Varian residual cenderung meningkat seiring dengan nilai prediksi. Hal ini menunjukkan bahwa homoskedastisitas terjadi.
+
+## Transformasi 
+
+### WLS
+Mencari nilai bobot:
+```{r}
+resid_abs <- abs(model_lm$residuals)
+fitted_val <- model_lm$fitted.values
+fit <- lm(resid_abs ~ fitted_val, data)
+data.weights <- 1 / fit$fitted.values^2
+data.weights
+plot(data.weights)
+```
+
+Hasil model regresi yang terboboti:
+```{r}
+model_weighted <- lm(Y~X, data = data, weights = data.weights)
+plot(model_weighted)
+summary(model_weighted)
+```
+Dari hasil transformasi WLS di atas dapat disimpulkan WLS belum efektif dalam mentransformasi model regresi dapat dibuktikan dari hasil ekplorasi di atas masih belum memenuhi asumsi Gauss-Markov
+
+### Transformasi Akar pada x, y, atau X dan y
+```{r}
+newdata <- data %>%
+  mutate(y = sqrt(Y)) %>%
+  mutate(x = sqrt(X))
+
+model_sqrtx <- lm(y ~ X, data = newdata)
+plot(x = newdata$X, y = newdata$y)
+plot(model_sqrtx)
+
+summary(model_sqrtx)
+```
+Hasil transformasi pertama dengan mengakar kan variable dependen menghasilkan model regresi:
+$$ \hat Y = 7.015455-0.081045 X $$
+## Uji Autokorelasi model regresi transformasi 
+```{r}
+dwtest(model_sqrtx)
+```
+Dengan nilai DW yang rendah dan p-value yang signifikan, hasil tes Durbin-Watson ini menunjukkan adanya autokorelasi positif. uji Durbin-Watson di atas terbukti masih adanya autokorelasi yang dibuktikan p-value yang kurang dari 0,05
+
+```{r}
+model_sqrt <- lm(y ~ x, data = newdata)
+plot(x = newdata$x, y = newdata$y)
+plot(model_sqrt)
+
+summary(model_sqrt)
+```
+Hasil transformasi pertama dengan mengakar kan variable dependen dan juga independennya menghasilkan model regresi:
+$$ \hat Y = 8.71245 -0.81339 X $$
+
+## Uji Autokorelasi Model Regresi
+
+```{r}
+dwtest(model_sqrt)
+```
+Nilai p yang lebih besar dari 0.05 menunjukkan bahwa tidak ada bukti yang cukup untuk menolak hipotesis nol. Dalam kasus ini, hipotesis nol adalah tidak ada autokorelasi.
+
+Dari hasil transformasi di atas dapat diambil kesimpulan jika transformasi akar Y membuat persamaan regresi menjadi lebih efektif.  Model regresi setelah transformaasi:
+
+$$ Y^* = 8.71245-0.81339X^* + e $$ 
+$$ Y^* = \sqrt Y $$
+$$ X^* = \sqrt X $$
+
+
+Dilakukan Transformasi balik menjadi:
+$$ Y = (8.71245-0.81339 X^{\frac {1}{2}})^2 + e $$
+
+Interpretasi
+Model ini menunjukkan bahwa Y berbanding terbalik dengan √X, dengan hubungan kuadratik. Semakin besar nilai √X, semakin kecil nilai rata-rata Y, dengan kecepatan yang semakin meningkat. Puncak kurva menunjukkan nilai rata-rata Y maksimum untuk nilai X tertentu. Konstanta  8.71245  mewakili nilai Y ketika X sama dengan 0. Koefisien -0.81339 adalah koefisien regresi untuk variabel X. Nilai negatif menunjukkan hubungan invers antara Y dan √X. Semakin besar nilai √X, semakin kecil nilai Y.Pangkat dua pada koefisien regresi menunjukkan bahwa hubungan antara Y dan X adalah kuadratik. Artinya, perubahan Y tidak proporsional dengan perubahan X, tetapi berubah dengan kecepatan yang semakin meningkat.
